@@ -465,6 +465,28 @@ abstract class CSSList {
 			}
 		}
 	}
+	
+	/**
+	 * Does the same thing as $this->allRuleSets except it creates
+	 * an associative array with the selector as the keys. If there
+	 * are multiple selectors in the rule set, then each one will
+	 * have their own array element.
+	 * 
+	 * @param array $aResult
+	 * 
+	 * @author dschaefer 12/23/2010
+	 */
+	protected function allUniqueRuleSets(&$aResult){
+		foreach($this->aContents as $mContent) {
+			if($mContent instanceof CSSRuleSet) {
+				foreach($mContent->getSelector() as $aSelector){
+					$aResult[$aSelector] = $mContent;
+				}
+			} else if($mContent instanceof CSSList) {
+				$mContent->allRuleSets($aResult);
+			}
+		}
+	}
 }
 
 class CSSDocument extends CSSList {
@@ -491,6 +513,44 @@ class CSSDocument extends CSSList {
 		$aResult = array();
 		$this->allValues($mElement, $aResult, $sSearchString);
 		return $aResult;
+	}
+	
+	/**
+	 * Does the same thing as $this->getAllRuleSets except it uses
+	 * CSSList->allUniqueRuleSets. This will generate an associative
+	 * array of rule sets with the selector as the key.
+	 * 
+	 * @return array
+	 */
+	public function getAllUniqueRuleSets(){
+		$aResult = array();
+		$this->allUniqueRuleSets($aResult);
+		return $aResult;
+	}
+	
+	/**
+	 * Gets just the style, not the entire rule set of the given
+	 * selector
+	 * @param string $sSelector
+	 * @return string
+	 */
+	public function getStyle($sSelector=""){
+		$sResult = "";
+		if($sSelector){
+			$aRuleSets = $this->getAllUniqueRuleSets();
+			$aSelectors = explode(",", $sSelector);
+			foreach($aSelectors as $sSelector){
+				$sSelector = trim($sSelector);
+				if(isset($aRuleSets[$sSelector])){
+					$oRuleSet = $aRuleSets[$sSelector];
+					$aRules = $oRuleSet->getRules();
+					foreach($aRules as $oRule){
+						$sResult .= $oRule->__toString()." ";
+					}
+				}
+			}
+		}
+		return $sResult;
 	}
 }
 
@@ -704,11 +764,24 @@ class CSSRule {
 	public function __toString() {
 		$sResult = "{$this->sRule}: ";
 		foreach($this->aValues as $aValues) {
-			$sResult .= implode(', ', $aValues).' ';
+			//Rewrote to account for CSSSize and CSSColor- dschaefer 12/22/2010
+			reset($aValues);
+			while($mValue = current($aValues)){
+				if(gettype($mValue) != 'object' && gettype($mValue) != 'array'){
+					$sResult .= $mValue." ";
+				}else if(gettype($mValue) == 'object'){
+					$sResult .= $mValue->__toString()." ";
+				}
+				if(next($aValues)){
+					$sResult .= ', ';
+				}
+			}
+			//$sResult .= implode(', ', $aValues).' ';
 		}
 		if($this->bIsImportant) {
 			$sResult .= '!important';
 		} else {
+			//What does this accomplish? Should this remove any semi-colons instead of removing the last character?
 			$sResult = substr($sResult, 0, -1);
 		}
 		$sResult .= ';';
@@ -780,7 +853,22 @@ class CSSColor extends CSSValue {
 	}
 	
 	public function __toString() {
-		return $this->getColorDescription().'('.implode(', ', $this->aColor).')';
+		//Rewrote to account for CSSSize - dschaefer 12/22/2010
+		$sResult = $this->getColorDescription().'(';
+		reset($this->aColor);
+		while($mColor = current($this->aColor)){
+			if(gettype($mColor) != "object"){
+				$sResult .= $mColor;
+			}else{
+				$sResult .= $mColor->__toString();
+			}
+			if(next($this->aColor)){
+				$sResult .= ', ';
+			}
+		}
+		$sResult .= ')';
+		return $sResult;
+		//return $this->getColorDescription().'('.implode(', ', $this->aColor).')';
 	}
 }
 
