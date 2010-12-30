@@ -403,6 +403,34 @@ class CSSParser {
 	private function inputLeft() {
 		return mb_substr($this->sText, $this->iCurrentPosition, -1, $this->sCharset);
 	}
+	
+	/**
+	 * Appends a string to the sText CSS string.
+	 * This allows you to add multiple strings before parsing
+	 * @param string $sText
+	 * 
+	 * @author dschaefer
+	 * @since 12/30/2010
+	 * 
+	 * @example $CSSParser = new CSSParser(file_get_contents("css/default.css"));
+	 * $CSSParser->append(file_get_contents("css/custom.css"));
+	 */
+	public function append($sText, $sCharest=NULL){
+		if(!isset($sCharest)){ $sCharest = $this->sCharset; }
+		$this->sText .= $sText;
+		$this->setCharset($sCharest);
+	}
+	
+	/**
+	 * Simply returns the private $sText variable
+	 * @return string
+	 * 
+	 * @author dschaefer
+	 * @since 12/30/2010
+	 */
+	public function getContents(){
+		return $this->sText;
+	}
 }
 
 abstract class CSSList {
@@ -472,18 +500,27 @@ abstract class CSSList {
 	 * are multiple selectors in the rule set, then each one will
 	 * have their own array element.
 	 * 
+	 * Fixed Bug: The CSSSelector->aSelector is not being set correctly
+	 * 
 	 * @param array $aResult
 	 * 
-	 * @author dschaefer 12/23/2010
+	 * @author dschaefer
+	 * @since 12/23/2010
 	 */
 	protected function allUniqueRuleSets(&$aResult){
-		foreach($this->aContents as $mContent) {
+		foreach($this->aContents as $mContent){
 			if($mContent instanceof CSSRuleSet) {
-				foreach($mContent->getSelector() as $aSelector){
-					$aResult[$aSelector] = $mContent;
+				foreach($mContent->getSelector() as $sSelector){
+					if(!isset($aResult[$sSelector])){
+						$aResult[$sSelector] = new CSSSelector();
+					}
+					$aResult[$sSelector]->setSelector($sSelector);
+					foreach($mContent->getRules() as $oRule){
+						$aResult[$sSelector]->addRule($oRule);
+					}
 				}
 			} else if($mContent instanceof CSSList) {
-				$mContent->allRuleSets($aResult);
+				$mContent->allUniqueRuleSets($aResult);
 			}
 		}
 	}
